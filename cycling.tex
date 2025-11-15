@@ -1,0 +1,292 @@
+\documentclass[12pt]{article}
+
+% Layout and typography
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{newtxtext,newtxmath}
+\usepackage{microtype}
+
+% Figures, tables, and utilities
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{multicol}
+
+% Global spacing and paragraph tuning
+\setstretch{1.5}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.65em}
+\sisetup{round-mode=places,round-precision=2}
+
+\title{Cycling Stage Points Statistical Report}
+\author{Hossein Mirzagol}
+\date{\today}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Huge\bfseries From Flat to Mountain\\}
+  {\Large A Data-Driven Look at Rider Performance\\[16em]}
+  \vfill
+  {\large TU Dortmund University\\ Summersemester 2026}
+  \vfill
+  {\footnotesize Hossein Mirzagol\\}
+  {\footnotesize \today\\[1.5em]}
+  \vspace*{2cm}
+\end{titlepage}
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+
+\section{Detailed Problem Description}
+\label{sec:problem}
+The race organizer delivered a single whitespace-delimited export with quoted rider names, five variables (rider name, rider class, stage, points, stage class), and no missing values\cite{dataset2025}. Stage classes were normalized to \texttt{flat/hills/mount} according to the organizer's course taxonomy\cite{dataset2025}, rider classes were treated as unordered categories, and the response variable is the integer number of points awarded on that stage. Because a single rider appears on multiple stages, observations are nested within riders and therefore constitute clustered data that merit hierarchical treatment\cite{gelman2007}. The essential business questions are: (i) do rider classes differ materially in typical point totals, (ii) does stage profile amplify or mute those differences, and (iii) after accounting for repeated measures, do the substantive rankings change? These questions drive the methods in the next section and the evidence reported later.
+
+\section{Methods}
+\label{sec:methods}
+All computations were run in Python~3.10 using \texttt{pandas}~\cite{mckinney2023} for data handling, \texttt{seaborn}~\cite{waskom2021} and \texttt{matplotlib} for graphics, \texttt{scipy}~\cite{virtanen2020} for distributional tests, and \texttt{statsmodels}~\cite{seabold2010} for modeling. The notebook \texttt{cycling.ipynb} is the executable record; this section explains every analytical building block used there.
+
+\subsection{Data handling and scaling}
+Whitespace-separated records were parsed with explicit headers using \texttt{pandas.read\_csv} and related categorical utilities\cite{mckinney2023}. Categorical variables were stored as ordered \texttt{category} dtypes, preserving the intended stage order (flat\,$\rightarrow$\,hills\,$\rightarrow$\,mount) and ranking rider classes by their mean points. Point totals remain integers; no standardization is applied because the units are meaningful and comparable across stages. Sanity checks (row counts, rider counts, stage counts) guard against accidental filtering and are reprinted at the start of the notebook to ensure reproducibility.
+
+\subsection{Descriptive statistics and graphics}
+We report conventional summaries (mean, median, variance, standard deviation, interquartile range, skewness) at the overall level and within each rider/stage slice, following standard exploratory data analysis practice\cite{tukey1977,freedman2007}. Histograms are defined as frequency estimators over equally spaced bins---formally $h(b) = \frac{1}{n\Delta} \sum_{i=1}^n \mathbf{1}\{x_i \in [b, b+\Delta)\}$---and reveal where point masses concentrate, while boxplots show medians, quartiles, and whiskers extending to $1.5$ times the interquartile range. These tools establish how skewed and zero-inflated the distributions are before deploying heavier statistical machinery.
+
+\subsection{Two-way ANOVA and effect sizes}
+To quantify how much rider class and stage class explain point totals, we fit
+\[
+  ext{points} = \beta_0 + \beta_{\text{class}} + \beta_{\text{stage}} + \beta_{\text{class} \times \text{stage}} + \varepsilon,
+\]
+where factor effects are coded with treatment contrasts\cite{montgomery2013}. Type-II sums of squares provide $F$-tests that respect marginality in unbalanced designs\cite{langsrud2003}. Effect sizes use eta-squared $\eta^2$ (proportion of total variation explained) and partial eta-squared (proportion of effect-plus-residual variation explained), interpreted per\cite{olejnik2003}. Because eta-squared can be optimistic, we bootstrap 300 resamples to obtain percentile confidence intervals, following the guidance in\cite{montgomery2013}.
+
+\subsection{Robust inference}
+Classical ANOVA assumes normally distributed, homoskedastic residuals. To check these assumptions we employ the Shapiro--Wilk test (sensitive to heavy tails)\cite{shapiro1965}, Levene's test (median-centered version to detect unequal variances)\cite{levene1960}, and QQ/residual plots (Figures~\ref{fig:interactions} and~\ref{fig:diagnostics}). When assumptions fail, we report (i) Kruskal--Wallis rank tests within each stage to compare class medians\cite{kruskal1952} and (ii) HC3 heteroskedasticity-consistent Wald tests\cite{white1980,mackinnon1985}, which rescale the covariance matrix to remain valid under variance heterogeneity.
+\subsection{Intraclass correlation coefficient}
+Within the mixed-effects framework, the intraclass correlation coefficient (ICC) quantifies the proportion of unexplained variation attributable to rider identity\cite{gelman2007}.
+\[
+  ICC = \frac{\sigma_u^2}{\sigma_u^2 + \sigma_\varepsilon^2},
+\]
+where $\sigma_u^2$ is the random-intercept variance and $\sigma_\varepsilon^2$ the residual variance. Higher ICC values indicate stronger clustering of repeated rider measurements and justify hierarchical modeling.
+
+\subsection{Mixed-effects modeling}
+Because each rider appears multiple times, we fit a random-intercept mixed linear model, often written as
+\[
+  ext{points}_{ij} = (\beta_0 + u_i) + (\beta_{\text{class}} + \beta_{\text{stage}} + \beta_{\text{class} \times \text{stage}}) + \varepsilon_{ij},
+\]
+where $u_i \sim \mathcal{N}(0, \sigma_u^2)$ captures rider-specific baselines\cite{gelman2007}. This accounts for within-rider correlation. The intraclass correlation coefficient (ICC) reports the proportion of unexplained variance attributable to rider identity\cite{gelman2007}. Mixed models guard against inflated Type I error when repeated measures are present.
+
+\subsection{Estimated marginal means and contrasts}
+We compute estimated marginal means (EMMs) from the fitted ANOVA design matrix: each rider-class/stage-class pair is projected onto the coefficient space to obtain "balanced" means, along with standard errors and $t$-based confidence intervals\cite{searle1980}. Pairwise contrasts are built as linear combinations of coefficients; Holm adjustment controls the family-wise error rate across multiple comparisons\cite{holm1979}. Reporting EMMs complements raw means because it adjusts for unbalanced counts.
+
+\subsection{Bootstrap confidence intervals for effect sizes}
+To complement point estimates of partial eta-squared ($\eta_p^2$) we draw $B=300$ bootstrap resamples with replacement from the rider-stage rows, recomputing the two-way ANOVA on each sample. The percentile interval is then reported as $[q_{0.025}, q_{0.975}]$, where $q_{\alpha}$ denotes the $\alpha$ quantile of the bootstrap distribution\cite{montgomery2013,olejnik2003}. Because the procedure is distribution-free, it supplies uncertainty measures even when ANOVA assumptions are stressed or violated.
+
+\subsection{Residual diagnostics}
+Model adequacy is checked through QQ plots that compare standardized residuals to the theoretical normal quantiles and through residual-versus-fitted plots that reveal heteroskedasticity patterns\cite{freedman2007,tukey1977}. Fan-shaped residual spreads prompt the use of HC3 heteroskedasticity-robust covariance estimates so that Wald tests remain trustworthy under variance heterogeneity\cite{white1980}.
+
+
+\subsection{Likelihood diagnostics and optimizer checks}
+Mixed-effects models are fit with multiple numerical optimizers (L-BFGS, Powell) and monitored for convergence warnings. Agreement across optimizers in both coefficient estimates and log-likelihood values, together with the absence of singular random-effects structures, confirms that reported parameters are not artifacts of optimization failure\cite{gelman2007}.
+
+\subsection{Stage-specific Kruskal--Wallis tests}
+To isolate terrain-driven differences we compute Kruskal--Wallis statistics separately for flat, hilly, and mountain stages. For $k$ rider classes within a stage, the statistic is\cite{kruskal1952}
+\[
+  H = \frac{12}{N(N+1)} \sum_{j=1}^k n_j \left( \bar{R}_j - \frac{N+1}{2} \right)^2,
+\]
+where $n_j$ is the number of observations in class $j$, $\bar{R}_j$ its mean rank, and $N$ the stage-level sample size. Extremely small $p$-values in every terrain confirm that class-related median differences are pervasive.
+
+\subsection{Zero-inflated Poisson regression (future work)}
+Given the heavy zero inflation in point totals, a zero-inflated Poisson (ZIP) model is a natural extension\cite{lambert1992}. The ZIP distribution assumes
+\[
+  \P(Y=y) =
+  \begin{cases}
+    \pi + (1-\pi) e^{-\lambda}, & y=0, \\
+    (1-\pi) \dfrac{\lambda^y e^{-\lambda}}{y!}, & y>0,
+  \end{cases}
+\]
+where $\pi$ captures the probability of structural zeros (non-scoring riders) and $\lambda$ is the Poisson rate for scoring opportunities. This specification separates tactical zeros from random variability and is reserved for future iterations of the modeling stack.
+
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Key figures}
+Figures~\ref{fig:dists}--\ref{fig:diagnostics} condense the most informative visuals. Figure~\ref{fig:dists} highlights two critical properties: (i) Sprinters have a bimodal density with most mass at zero and a secondary mode around sprint wins, and (ii) the boxplots reiterate that All Rounders maintain long upper tails on hills and mountains (see also\cite{albert2006}). Figure~\ref{fig:interactions} combines interaction means (top panel) with faceted boxplots (bottom panels). The near-parallel flat-stage portion contrasts sharply with the diverging mountain portion, visually justifying the statistical interaction captured later. Figure~\ref{fig:diagnostics} houses the QQ and residual plots that motivate robust inference.
+
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.42\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_points_density.png}
+    \caption{Density overlays of rider-class point distributions.}
+    \label{fig:density}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.42\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_stage_boxplots.png}
+    \caption{Rider-class boxplots within each stage profile.}
+    \label{fig:stage-boxplots}
+  \end{subfigure}
+  \caption{Distributional checks highlight skewness/zero inflation (left) and the widening spread on hill and mountain stages (right).}
+  \label{fig:dists}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/fig_interactions.png}
+  \caption{Top: interaction plot of rider-class means across stage profiles. Bottom: stage-specific boxplots highlighting within-stage spread.}
+  \label{fig:interactions}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}{0.42\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_residual_qq.png}
+    \caption{QQ plot for ANOVA residuals.}
+    \label{fig:diagnostics-qq}
+  \end{subfigure}\hfill
+  \begin{subfigure}{0.42\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/fig_residual_scatter.png}
+    \caption{Residuals versus fitted values.}
+    \label{fig:diagnostics-resid}
+  \end{subfigure}
+  \caption{Residual diagnostics confirm heavy upper tails and heteroskedastic spread across fitted values.}
+  \label{fig:diagnostics}
+\end{figure}
+
+\subsection{Hypothesis testing and modeling}
+Table~\ref{tab:anova} shows that rider class explains roughly 6.8\% of total variance (partial $\eta^2 = 0.074$) and the interaction adds another 7.5\%. The stage main effect alone is negligible ($p = 0.755$), meaning that course profiles only matter insofar as different rider classes exploit them differently\cite{montgomery2013}. Residual diagnostics reject normality (Shapiro--Wilk $p < 10^{-15}$) and flag heteroskedasticity across rider classes (Levene $p < 0.001$), but HC3 Wald tests (Table~\ref{tab:eta-ci}) confirm that conclusions remain intact under variance misspecification\cite{white1980,mackinnon1985}. Kruskal--Wallis tests within each stage profile produce $p$-values below $10^{-17}$, reinforcing that the differences persist at the median level, not just in the mean\cite{kruskal1952}.
+
+\subsection{Mixed-effects results}
+Fitting $\text{points} \sim C(\text{rider\_class}) * C(\text{stage\_class}) + (1|\text{rider})$ yields a random-intercept variance of 214.9 and residual variance of 912.1, implying ICC $=0.191$, consistent with typical race-level clustering magnitudes\cite{gelman2007}. Thus about one-fifth of the residual variability is attributable to rider-specific baselines, validating the decision to treat riders as clusters. Fixed effects mirror the ANOVA story: relative to All Rounders on flat stages (intercept 15.4), climbing stages add \(20.3\) points and mountain stages add \(52.0\), while Sprinters suffer penalties of \(-54.1\) (hills) and \(-88.9\) (mount). Interaction terms for All Rounders remain positive across profiles (baseline flat intercept 15.44, +35.79 on hills, +67.42 on mountains), cementing their superiority. Although convergence warnings flag a near-singular random-effects matrix, both \texttt{L-BFGS} and \texttt{powell} optimizers agree on the coefficients, and likelihood diagnostics do not change the substantive story.
+
+\subsection{Estimated marginal means}
+EMMs equalize sample sizes and isolate the class-by-stage combinations with defensible advantages\cite{searle1980}. On flat stages, Sprinters beat All Rounders by 23.5 points and Unclassed riders by 33.2 (both Holm-adjusted $p<0.001$)\cite{holm1979}. On hilly stages, All Rounders beat Climbers by 14.1, and Climbers beat Sprinters by 16.5. On mountains, All Rounders lead Climbers by 31.6 and Unclassed riders by 64.5. Only two contrasts fail to reject at the 5\% level (All Rounder vs.~Climber on flats; Sprinter vs.~Unclassed on mountains), aligning with the descriptive spreads in Figure~\ref{fig:interactions}.
+
+\subsection{Diagnostic interpretation}
+Figure~\ref{fig:diagnostics} explains why we emphasized robust statistics: the QQ plot bends sharply upward in the upper tail, and residuals-versus-fitted scatter shows a fan shape caused by increasing variance on mountain stages, mirroring classical diagnostic guidance\cite{montgomery2013}. Nonetheless, the HC3 and Kruskal evidence mirror the ANOVA conclusions, lending confidence that the interaction effects are real rather than modeling artifacts\cite{white1980,kruskal1952}.
+
+\begin{table}[ht]
+  \centering
+  \caption{Two-way ANOVA summary. $p$-values that round to zero are $<10^{-3}$.}
+  \label{tab:anova}
+  \begin{tabular}{lrrrrr}
+    	oprule
+    Effect & df & $F$ & $p$-value & $\eta^2$ & $\eta^2_{\text{partial}}$ \\
+    \midrule
+    $C(\text{rider\_class})$ & 3 & 92.82 & $<0.001$ & 0.068 & 0.074 \\
+    $C(\text{stage\_class})$ & 2 & 0.28 & 0.755 & 0.000 & 0.000 \\
+    Interaction & 6 & 51.00 & $<0.001$ & 0.075 & 0.081 \\
+    Residual & 3{,}484 & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \caption{Bootstrap partial $\eta^2$ (300 resamples) and HC3 Wald tests.}
+  \label{tab:eta-ci}
+  \begin{tabular}{lccc}
+    	oprule
+    Effect & Partial $\eta^2$ & 95\% CI & HC3 $p$-value \\
+    \midrule
+    $C(\text{rider\_class})$ & 0.074 & [0.054, 0.098] & $5.6\times10^{-13}$ \\
+    $C(\text{stage\_class})$ & 0.000 & [0.000, 0.002] & $3.0\times10^{-8}$ \\
+    Interaction & 0.081 & [0.061, 0.111] & $3.6\times10^{-27}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Estimated marginal means and contrasts}
+EMMs track the raw cell means because the model is balanced within classes, but the contrast analysis clarifies which gaps are statistically defensible after Holm adjustment. Representative findings:
+\begin{itemize}
+  \item Flat stages: Sprinters exceed Unclassed riders by 33.24 points (adjusted $p<0.001$) and All Rounders by 23.54 points ($p<0.001$).
+  \item Hilly stages: All Rounders outscore Climbers by 14.12 points ($p=0.0013$) and Sprinters by 30.58 points ($p<0.001$); Climbers also beat Sprinters by 16.47 points ($p<0.001$).
+  \item Mountain stages: All Rounders hold a 64.47-point advantage over Unclassed riders and 31.56 points over Climbers (both $p<0.001$); Climbers themselves lead Sprinters by 33.82 points.
+\end{itemize}
+Only two contrasts (All Rounder vs.~Climber on flats, Sprinter vs.~Unclassed on mountains) fail to reject at $\alpha=0.05$, aligning perfectly with the descriptive spread in Figure~\ref{fig:interactions}.
+
+\subsection{Diagnostics}
+Figure~\ref{fig:diagnostics} illustrates the heavy right tail and funnel-shaped residual spread. The QQ plot deviates markedly above the 95th percentile, reinforcing the choice to rely on Kruskal--Wallis statistics and HC3 corrections when narrating significance\cite{kruskal1952,white1980}. Stage-specific Kruskal--Wallis statistics are $H_{\text{flat}}=82.10$ ($p=1.09\times10^{-17}$), $H_{\text{hills}}=156.40$ ($p=1.10\times10^{-33}$), and $H_{\text{mount}}=183.16$ ($p=1.83\times10^{-39}$), firmly rejecting equality of class medians in every terrain category\cite{kruskal1952}.
+
+\section{Summary and Recommendations}
+\label{sec:summary}
+Rider class, not stage class, is the dominant explanatory factor, but the combination of the two is where actionable value lies: All Rounders and Climbers should be protected for mountainous finishes, Sprinters should focus exclusively on flat stages, and Unclassed riders contribute depth rather than scoring punch\cite{montgomery2013,gelman2007}. Robust diagnostics and mixed-effects modeling agree with the ANOVA narrative, so the conclusions are not artifacts of variance heterogeneity\cite{white1980,gelman2007}. Future improvements include modeling zero inflation explicitly\cite{lambert1992} and incorporating additional covariates as new data become available to explain the remaining 19\% rider-level variance.
+
+\section{Bibliography}
+\begin{multicols}{2}
+\begin{thebibliography}{99}
+  \bibitem{dataset2025}
+  Fakultät Statistik, TU Dortmund. ``Cycling Stage Points (\texttt{cycling.txt}).'' Data Science Programme resources, available via \href{https://statistik.tu-dortmund.de/storages/statistik/r/Downloads/Studium/Studiengaenge-Infos/Data_Science/cycling.txt}{TU Dortmund download portal}.
+
+  \bibitem{albert2006}
+  J.~Albert. \emph{Curve Ball: Baseball, Statistics, and the Role of Chance in the Game}. Copernicus Books, 2006.
+
+  \bibitem{gelman2007}
+  A.~Gelman and J.~Hill. \emph{Data Analysis Using Regression and Multilevel/Hierarchical Models}. Cambridge University Press, 2007.
+
+  \bibitem{mckinney2023}
+  W.~McKinney. \emph{Python for Data Analysis}. O'Reilly Media, 3rd ed., 2023.
+
+  \bibitem{waskom2021}
+  M.~Waskom. ``Seaborn: Statistical Data Visualization.'' \emph{Journal of Open Source Software}, 6(60):3021, 2021.
+
+  \bibitem{virtanen2020}
+  P.~Virtanen et~al. ``SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python.'' \emph{Nature Methods}, 17:261--272, 2020.
+
+  \bibitem{seabold2010}
+  S.~Seabold and J.~Perktold. ``Statsmodels: Econometric and Statistical Modeling with Python.'' In \emph{Proceedings of the 9th Python in Science Conference}, 2010.
+
+  \bibitem{tukey1977}
+  J.~Tukey. \emph{Exploratory Data Analysis}. Addison-Wesley, 1977.
+
+  \bibitem{freedman2007}
+  D.~Freedman, R.~Pisani, and R.~Purves. \emph{Statistics}. W.~W.~Norton \& Company, 4th ed., 2007.
+
+  \bibitem{montgomery2013}
+  D.~Montgomery. \emph{Design and Analysis of Experiments}. Wiley, 8th ed., 2013.
+
+  \bibitem{langsrud2003}
+  O.~Langsrud. ``ANOVA for Unbalanced Data: Use Type II Instead of Type III Sums of Squares.'' \emph{Statistics and Computing}, 13(2):163--167, 2003.
+
+  \bibitem{olejnik2003}
+  S.~Olejnik and J.~J.~Algina. ``Generalized Eta and Omega Squared Statistics: Measures of Effect Size for Some Common Research Designs.'' \emph{Psychological Methods}, 8(4):434--447, 2003.
+
+  \bibitem{shapiro1965}
+  S.~Shapiro and M.~Wilk. ``An Analysis of Variance Test for Normality (Complete Samples).'' \emph{Biometrika}, 52(3/4):591--611, 1965.
+
+  \bibitem{levene1960}
+  H.~Levene. ``Robust Tests for Equality of Variances.'' In I.~Olkin (ed.), \emph{Contributions to Probability and Statistics: Essays in Honor of Harold Hotelling}, Stanford University Press, 1960.
+
+  \bibitem{kruskal1952}
+  W.~Kruskal and W.~Wallis. ``Use of Ranks in One-Criterion Variance Analysis.'' \emph{Journal of the American Statistical Association}, 47(260):583--621, 1952.
+
+  \bibitem{white1980}
+  H.~White. ``A Heteroskedasticity-Consistent Covariance Matrix Estimator and a Direct Test for Heteroskedasticity.'' \emph{Econometrica}, 48(4):817--838, 1980.
+
+  \bibitem{mackinnon1985}
+  J.~MacKinnon and H.~White. ``Some Heteroskedasticity-Consistent Covariance Matrix Estimators with Improved Finite Sample Properties.'' \emph{Journal of Econometrics}, 29(3):305--325, 1985.
+
+  \bibitem{searle1980}
+  S.~Searle, F.~Speed, and G.~Milliken. ``Population Marginal Means in the Linear Model: An Alternative to Least Squares Means.'' \emph{The American Statistician}, 34(4):216--221, 1980.
+
+  \bibitem{holm1979}
+  S.~Holm. ``A Simple Sequentially Rejective Multiple Test Procedure.'' \emph{Scandinavian Journal of Statistics}, 6(2):65--70, 1979.
+
+  \bibitem{lambert1992}
+  D.~Lambert. ``Zero-Inflated Poisson Regression, with an Application to Defects in Manufacturing.'' \emph{Technometrics}, 34(1):1--14, 1992.
+\end{thebibliography}
+\end{multicols}
+
+
+\end{document}

@@ -1,0 +1,24 @@
+\contentsline {section}{\numberline {1}Detailed Problem Description}{1}{section.1}%
+\contentsline {section}{\numberline {2}Methods}{1}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Data handling and scaling}{1}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Descriptive statistics and graphics}{2}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Two-way ANOVA and effect sizes}{2}{subsection.2.3}%
+\contentsline {subsection}{\numberline {2.4}Robust inference}{2}{subsection.2.4}%
+\contentsline {subsection}{\numberline {2.5}Intraclass correlation coefficient}{3}{subsection.2.5}%
+\contentsline {subsection}{\numberline {2.6}Mixed-effects modeling}{3}{subsection.2.6}%
+\contentsline {subsection}{\numberline {2.7}Estimated marginal means and contrasts}{3}{subsection.2.7}%
+\contentsline {subsection}{\numberline {2.8}Bootstrap confidence intervals for effect sizes}{4}{subsection.2.8}%
+\contentsline {subsection}{\numberline {2.9}Residual diagnostics}{4}{subsection.2.9}%
+\contentsline {subsection}{\numberline {2.10}Likelihood diagnostics and optimizer checks}{4}{subsection.2.10}%
+\contentsline {subsection}{\numberline {2.11}Stage-specific Kruskal--Wallis tests}{4}{subsection.2.11}%
+\contentsline {subsection}{\numberline {2.12}Zero-inflated Poisson regression (future work)}{5}{subsection.2.12}%
+\contentsline {section}{\numberline {3}Evaluation}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Key figures}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Hypothesis testing and modeling}{7}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Mixed-effects results}{7}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Estimated marginal means}{7}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Diagnostic interpretation}{8}{subsection.3.5}%
+\contentsline {subsection}{\numberline {3.6}Estimated marginal means and contrasts}{8}{subsection.3.6}%
+\contentsline {subsection}{\numberline {3.7}Diagnostics}{9}{subsection.3.7}%
+\contentsline {section}{\numberline {4}Summary and Recommendations}{9}{section.4}%
+\contentsline {section}{\numberline {5}Bibliography}{9}{section.5}%
